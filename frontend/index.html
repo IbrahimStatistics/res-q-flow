@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Setu — Disaster Relief Coordination</title>
+<link rel="stylesheet" href="vendor/leaflet/leaflet.css"/>
+<link rel="stylesheet" href="vendor/fonts/fonts.css">
+<style>
+:root{
+  --bg:#0B0F14; --panel:#12181F; --panel-2:#171F28; --border:#232C37;
+  --text:#E7EDF3; --text-dim:#8996A6; --text-faint:#5C6B7C;
+  --amber:#F0A93B; --amber-dim:#5A4522;
+  --teal:#3FCFB0; --teal-dim:#173832;
+  --red:#EE5B5F; --red-dim:#4A2226;
+  --green:#4CC17E; --green-dim:#1D3A2A;
+  --blue:#5B9BD5;
+  font-family:"IBM Plex Sans",system-ui,sans-serif;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);height:100%;overflow:hidden;}
+button{font-family:inherit;}
+::-webkit-scrollbar{width:8px;height:8px;}
+::-webkit-scrollbar-thumb{background:#2A3542;border-radius:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+
+.mono{font-family:"IBM Plex Mono",monospace;}
+
+/* ---------- Top bar ---------- */
+#topbar{
+  height:56px; display:flex; align-items:center; justify-content:space-between;
+  padding:0 18px; border-bottom:1px solid var(--border); background:var(--panel);
+  position:relative; z-index:20;
+}
+#brand{display:flex; align-items:center; gap:12px;}
+#brand .mark{
+  width:30px;height:30px;border-radius:7px;
+  background:linear-gradient(135deg,var(--teal),#1C7A66);
+  display:flex;align-items:center;justify-content:center;font-weight:700;color:#04211B;font-size:15px;
+}
+#brand .name{font-weight:600;font-size:16.5px;letter-spacing:0.2px;}
+#brand .tag{font-size:11.5px;color:var(--text-dim);margin-top:1px;}
+#brand .nametag{display:flex;flex-direction:column;line-height:1.15;}
+#viewtabs{display:flex;gap:2px;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:3px;}
+#viewtabs button{
+  background:transparent;border:none;color:var(--text-dim);padding:7px 14px;border-radius:6px;
+  font-size:12.5px;font-weight:500;cursor:pointer;transition:.15s;
+}
+#viewtabs button.active{background:var(--panel);color:var(--text);}
+#topright{display:flex;align-items:center;gap:16px;font-size:12px;color:var(--text-dim);}
+#clock{font-family:"IBM Plex Mono",monospace;color:var(--text);font-size:13px;}
+.livedot{width:7px;height:7px;border-radius:50%;background:var(--teal);display:inline-block;margin-right:6px;
+  box-shadow:0 0 0 0 rgba(63,207,176,.6); animation:pulse 2s infinite;}
+@keyframes pulse{
+  0%{box-shadow:0 0 0 0 rgba(63,207,176,.55);}
+  70%{box-shadow:0 0 0 6px rgba(63,207,176,0);}
+  100%{box-shadow:0 0 0 0 rgba(63,207,176,0);}
+}
+.livedot.busy{background:var(--amber); animation:pulse-a 1s infinite;}
+@keyframes pulse-a{
+  0%{box-shadow:0 0 0 0 rgba(240,169,59,.6);}
+  70%{box-shadow:0 0 0 7px rgba(240,169,59,0);}
+  100%{box-shadow:0 0 0 0 rgba(240,169,59,0);}
+}
+
+/* ---------- Layout ---------- */
+#app{display:flex; height:calc(100vh - 56px);}
+#mapwrap{flex:1 1 auto; position:relative; min-width:0;}
+#map{position:absolute; inset:0;}
+#sidebar{width:400px; flex:0 0 400px; border-left:1px solid var(--border); background:var(--panel);
+  display:flex; flex-direction:column; overflow:hidden;}
+
+/* map legend */
+#legend{
+  position:absolute; left:14px; bottom:14px; background:rgba(18,24,31,.92); border:1px solid var(--border);
+  border-radius:10px; padding:10px 13px; font-size:11.5px; color:var(--text-dim); z-index:400; backdrop-filter:blur(4px);
+}
+#legend .row{display:flex;align-items:center;gap:7px;margin:3px 0;}
+#legend .sw{width:10px;height:10px;border-radius:3px;flex:0 0 auto;}
+
+/* action dock */
+#dock{
+  position:absolute; top:14px; left:14px; right:14px; z-index:400; display:flex; gap:8px; flex-wrap:wrap;
+  pointer-events:none;
+}
+#dock .grp{display:flex; gap:6px; pointer-events:auto; background:rgba(18,24,31,.92); border:1px solid var(--border);
+  border-radius:10px; padding:6px; backdrop-filter:blur(4px);}
+.dockbtn{
+  background:var(--panel-2); border:1px solid var(--border); color:var(--text); padding:8px 12px; border-radius:7px;
+  font-size:12.3px; font-weight:500; cursor:pointer; display:flex; align-items:center; gap:6px; white-space:nowrap;
+  transition:.12s;
+}
+.dockbtn:hover{border-color:#3A4757; background:#1B242F;}
+.dockbtn:active{transform:translateY(1px);}
+.dockbtn.primary{background:var(--teal); color:#04211B; border-color:var(--teal); font-weight:600;}
+.dockbtn.primary:hover{background:#57DABF;}
+.dockbtn.warn{color:var(--amber); border-color:var(--amber-dim);}
+.dockbtn.crit{color:var(--red); border-color:var(--red-dim);}
+.dockbtn:disabled{opacity:.45; cursor:not-allowed;}
+#roadmenu{position:relative;}
+#roadmenu .panel{
+  display:none; position:absolute; top:calc(100% + 6px); left:0; background:var(--panel-2); border:1px solid var(--border);
+  border-radius:9px; padding:8px; width:250px; z-index:500;
+}
+#roadmenu.open .panel{display:block;}
+.roadrow{display:flex; justify-content:space-between; align-items:center; padding:6px 4px; font-size:12px; gap:8px;}
+.roadrow .rtoggle{width:32px;height:18px;border-radius:10px;background:#2A3542;position:relative;cursor:pointer;flex:0 0 auto;}
+.roadrow .rtoggle.on{background:var(--red);}
+.roadrow .rtoggle .knob{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:.15s;}
+.roadrow .rtoggle.on .knob{left:16px;}
+
+/* ---------- Sidebar tabs ---------- */
+#sidetabs{display:flex; border-bottom:1px solid var(--border); flex:0 0 auto;}
+#sidetabs button{
+  flex:1; background:transparent; border:none; color:var(--text-faint); padding:12px 4px; font-size:11.3px;
+  font-weight:600; letter-spacing:.3px; text-transform:uppercase; cursor:pointer; border-bottom:2px solid transparent;
+}
+#sidetabs button.active{color:var(--text); border-bottom-color:var(--teal);}
+#sidepanes{flex:1; overflow-y:auto; padding:14px;}
+.pane{display:none;}
+.pane.active{display:block;}
+
+.sectitle{font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--text-faint); font-weight:600; margin:14px 0 8px;}
+.sectitle:first-child{margin-top:0;}
+
+/* allocation cards */
+.card{
+  background:var(--panel-2); border:1px solid var(--border); border-radius:10px; padding:11px 12px; margin-bottom:9px;
+}
+.card .crow{display:flex; justify-content:space-between; align-items:flex-start; gap:8px;}
+.card .title{font-size:13px; font-weight:600;}
+.card .sub{font-size:11.5px; color:var(--text-dim); margin-top:2px;}
+.badge{font-size:10px; font-weight:600; padding:2px 7px; border-radius:5px; text-transform:uppercase; letter-spacing:.3px; white-space:nowrap;}
+.badge.recommended{background:var(--amber-dim); color:var(--amber);}
+.badge.approved{background:var(--green-dim); color:var(--green);}
+.badge.overridden{background:#2A2140; color:#B08CE8;}
+.badge.rejected{background:var(--red-dim); color:var(--red);}
+.badge.critical{background:var(--red-dim); color:var(--red);}
+.card .explain{font-size:11.5px; color:var(--text-dim); margin-top:7px; line-height:1.5; border-top:1px solid var(--border); padding-top:7px;}
+.card .meta{display:flex; gap:10px; margin-top:7px; font-size:11px; color:var(--text-faint);}
+.card .meta b{color:var(--text-dim); font-weight:600;}
+.card .actions{display:flex; gap:6px; margin-top:9px;}
+.minibtn{flex:1; background:var(--panel); border:1px solid var(--border); color:var(--text); padding:6px 8px; border-radius:6px;
+  font-size:11.3px; font-weight:500; cursor:pointer;}
+.minibtn.approve{background:var(--green-dim); border-color:#26543A; color:var(--green);}
+.minibtn.override{color:var(--amber);}
+.minibtn.reject{color:var(--red);}
+.minibtn:hover{filter:brightness(1.15);}
+
+.override-form{margin-top:8px; display:none; gap:6px; flex-direction:column;}
+.override-form.open{display:flex;}
+.override-form select, .override-form input{
+  background:var(--panel); border:1px solid var(--border); color:var(--text); border-radius:6px; padding:6px 8px; font-size:11.5px;
+}
+
+.empty{color:var(--text-faint); font-size:12px; padding:16px 4px; text-align:center;}
+
+/* audit / event log */
+.logrow{padding:8px 0; border-bottom:1px solid var(--border); font-size:12px;}
+.logrow .t{color:var(--text-faint); font-size:10.5px; margin-right:8px;}
+.logrow.audit .action{font-weight:600; text-transform:uppercase; font-size:10px; letter-spacing:.4px; margin-right:6px;}
+.logrow.audit .action.approve{color:var(--green);}
+.logrow.audit .action.override{color:var(--amber);}
+.logrow.audit .action.reject{color:var(--red);}
+.logrow .reason{color:var(--text-faint); font-style:italic;}
+
+/* kpis */
+.kpigrid{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+.kpi{background:var(--panel-2); border:1px solid var(--border); border-radius:10px; padding:11px;}
+.kpi .val{font-size:21px; font-weight:700; font-family:"IBM Plex Mono",monospace;}
+.kpi .lbl{font-size:10.5px; color:var(--text-dim); margin-top:3px; line-height:1.3;}
+.kpi.wide{grid-column:1/-1;}
+.comparerow{display:flex; justify-content:space-between; font-size:12px; padding:7px 0; border-bottom:1px solid var(--border);}
+.comparerow b{font-family:"IBM Plex Mono",monospace;}
+
+/* policy sliders */
+.slider-row{margin-bottom:14px;}
+.slider-row .lbl{display:flex; justify-content:space-between; font-size:12px; margin-bottom:5px;}
+.slider-row .lbl span:last-child{font-family:"IBM Plex Mono",monospace; color:var(--teal);}
+.slider-row input[type=range]{width:100%; accent-color:var(--teal);}
+.hint{font-size:11px; color:var(--text-faint); line-height:1.5; margin-top:3px;}
+
+/* leaflet marker tweaks */
+.setu-pin{border-radius:50%; border:2px solid #04211B; box-shadow:0 0 0 2px rgba(0,0,0,.3);}
+.leaflet-popup-content-wrapper{background:var(--panel-2); color:var(--text); border-radius:8px;}
+.leaflet-popup-tip{background:var(--panel-2);}
+.leaflet-popup-content{font-size:12.5px; font-family:"IBM Plex Sans",sans-serif;}
+.leaflet-container{background:#0A0E13;}
+
+/* public view */
+#publicwrap{display:none; height:100%; flex-direction:column;}
+#publicwrap.active{display:flex;}
+#publichead{padding:20px 26px 14px; border-bottom:1px solid var(--border);}
+#publichead h1{font-size:20px; margin:0 0 4px;}
+#publichead p{margin:0; color:var(--text-dim); font-size:13px; max-width:640px;}
+#publicmapwrap{flex:1; position:relative;}
+#publicmap{position:absolute; inset:0;}
+.pcard{position:absolute; bottom:16px; left:16px; right:16px; max-height:38%; overflow-y:auto; background:rgba(18,24,31,.95);
+  border:1px solid var(--border); border-radius:12px; padding:12px; z-index:400; display:flex; gap:10px; flex-wrap:wrap;}
+.shelter-chip{flex:1 1 220px; background:var(--panel-2); border:1px solid var(--border); border-radius:9px; padding:10px 12px;}
+.shelter-chip .n{font-weight:600; font-size:13px;}
+.shelter-chip .occ{font-size:11.5px; color:var(--text-dim); margin-top:4px;}
+.occbar{height:5px; border-radius:3px; background:#232C37; margin-top:6px; overflow:hidden;}
+.occbar i{display:block; height:100%; background:var(--teal);}
+.occbar i.full{background:var(--red);}
+.updated{font-size:10.5px; color:var(--text-faint); margin-top:6px;}
+
+#toast{position:fixed; bottom:18px; left:50%; transform:translateX(-50%) translateY(10px); background:var(--panel-2);
+  border:1px solid var(--border); border-left:3px solid var(--teal); color:var(--text); padding:11px 16px; border-radius:9px;
+  font-size:12.5px; z-index:999; opacity:0; transition:.25s; pointer-events:none; max-width:520px;}
+#toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <div id="brand">
+    <div class="mark">स</div>
+    <div class="nametag">
+      <div class="name">Setu</div>
+      <div class="tag">East Delhi flood response — coordination prototype</div>
+    </div>
+  </div>
+  <div id="viewtabs">
+    <button id="tab-console" class="active" onclick="setView('console')">Coordinator Console</button>
+    <button id="tab-public" onclick="setView('public')">Public Shelter Locator</button>
+  </div>
+  <div id="topright">
+    <span><span class="livedot" id="livedot"></span><span id="livetext">live</span></span>
+    <span id="clock" class="mono"></span>
+  </div>
+</div>
+
+<div id="app">
+
+  <!-- COORDINATOR CONSOLE -->
+  <div id="consolewrap" style="display:flex; width:100%;">
+    <div id="mapwrap">
+      <div id="map"></div>
+
+      <div id="dock">
+        <div class="grp">
+          <button class="dockbtn primary" onclick="doOptimize()">⟲ Optimize now</button>
+          <button class="dockbtn" onclick="simCrowd()">📡 Simulate crowdsourced reports</button>
+          <button class="dockbtn crit" onclick="simCritical()">▲ Inject critical emergency</button>
+        </div>
+        <div class="grp" id="roadmenu">
+          <button class="dockbtn warn" onclick="toggleRoadMenu()">⛔ Road blocks ▾</button>
+          <div class="panel" id="roadpanel"></div>
+        </div>
+        <div class="grp">
+          <button class="dockbtn" onclick="resetScenario()">↺ Reset scenario</button>
+        </div>
+      </div>
+
+      <div id="legend">
+        <div class="row"><span class="sw" style="background:#5B9BD5"></span>Relief hub</div>
+        <div class="row"><span class="sw" style="background:#8B98A5"></span>Vehicle</div>
+        <div class="row"><span class="sw" style="background:#EE5B5F"></span>Critical demand (Tier 1)</div>
+        <div class="row"><span class="sw" style="background:#F0A93B"></span>Demand (recommended)</div>
+        <div class="row"><span class="sw" style="background:#4CC17E"></span>Approved dispatch route</div>
+        <div class="row"><span class="sw" style="background:#5C6B7C;border:1px dashed #EE5B5F"></span>Blocked road leg</div>
+      </div>
+    </div>
+
+    <div id="sidebar">
+      <div id="sidetabs">
+        <button class="active" data-pane="queue" onclick="setSideTab('queue')">Queue</button>
+        <button data-pane="audit" onclick="setSideTab('audit')">Audit</button>
+        <button data-pane="kpi" onclick="setSideTab('kpi')">KPIs</button>
+        <button data-pane="policy" onclick="setSideTab('policy')">Policy</button>
+      </div>
+      <div id="sidepanes">
+        <div class="pane active" id="pane-queue">
+          <div class="sectitle">Recommended allocations</div>
+          <div id="allocList"></div>
+          <div class="sectitle">Held for corroboration <span style="color:var(--text-faint);font-weight:400;text-transform:none;">(below confidence floor)</span></div>
+          <div id="heldList"></div>
+        </div>
+        <div class="pane" id="pane-audit">
+          <div class="sectitle">Live event feed</div>
+          <div id="eventLog"></div>
+          <div class="sectitle">Audit log <span style="color:var(--text-faint);font-weight:400;text-transform:none;">(every approve / override, immutable)</span></div>
+          <div id="auditLog"></div>
+        </div>
+        <div class="pane" id="pane-kpi">
+          <div class="sectitle">This scenario run</div>
+          <div class="kpigrid" id="kpiGrid"></div>
+          <div class="sectitle">Baseline vs. Setu <span style="color:var(--text-faint);font-weight:400;text-transform:none;">(synthetic simulation)</span></div>
+          <div id="compareTable"></div>
+          <div class="hint">Prototype simulation results — synthetic scenario, not real deployment data.</div>
+        </div>
+        <div class="pane" id="pane-policy">
+          <div class="sectitle">Allocation policy weights <span style="color:var(--text-faint);font-weight:400;text-transform:none;">(visible, auditable — not a black box)</span></div>
+          <div id="policySliders"></div>
+          <div class="hint">priority = w1·severity + w2·population + w3·vulnerability + w4·freshness − w5·(1−confidence). Changing a weight triggers an immediate re-optimization.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PUBLIC LOCATOR -->
+  <div id="publicwrap">
+    <div id="publichead">
+      <h1>Nearby shelters &amp; relief points</h1>
+      <p>Read-only, no sign-in required. Occupancy and status are shown with a last-updated time — never presented as more certain than it is.</p>
+    </div>
+    <div id="publicmapwrap">
+      <div id="publicmap"></div>
+      <div class="pcard" id="shelterCards"></div>
+    </div>
+  </div>
+
+</div>
+
+<div id="toast"></div>
+
+<script src="vendor/leaflet/leaflet.js"></script>
+<script>
+const API = '';
+let state = null;
+let map, publicMap;
+let hubMarkers=[], vehicleMarkers=[], demandMarkers=[], routeLines=[], roadMarkers=[];
+let publicMarkers=[];
+let busy = false;
+let roadMenuOpen = false;
+
+// ---------- clock ----------
+setInterval(()=>{
+  document.getElementById('clock').textContent = new Date().toLocaleTimeString('en-IN',{hour12:false});
+}, 1000);
+
+// ---------- view switching ----------
+function setView(v){
+  document.getElementById('tab-console').classList.toggle('active', v==='console');
+  document.getElementById('tab-public').classList.toggle('active', v==='public');
+  document.getElementById('consolewrap').style.display = v==='console' ? 'flex' : 'none';
+  document.getElementById('publicwrap').classList.toggle('active', v==='public');
+  if(v==='public'){ initPublicMap(); fetchShelters(); }
+}
+
+function setSideTab(name){
+  document.querySelectorAll('#sidetabs button').forEach(b=>b.classList.toggle('active', b.dataset.pane===name));
+  document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('active', p.id==='pane-'+name));
+}
+
+// ---------- toast ----------
+let toastTimer;
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove('show'), 3600);
+}
+
+// ---------- map init ----------
+function initMap(){
+  map = L.map('map', {zoomControl:false, attributionControl:false}).setView([28.622,77.298], 13);
+  L.control.zoom({position:'topright'}).addTo(map);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    subdomains:'abcd', maxZoom:19
+  }).addTo(map);
+}
+function initPublicMap(){
+  if(publicMap) { setTimeout(()=>publicMap.invalidateSize(),50); return; }
+  publicMap = L.map('publicmap', {zoomControl:false, attributionControl:false}).setView([28.622,77.298], 13);
+  L.control.zoom({position:'topright'}).addTo(publicMap);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {subdomains:'abcd', maxZoom:19}).addTo(publicMap);
+}
+
+function dot(color, size=11){
+  return L.divIcon({
+    className:'', html:`<div class="setu-pin" style="width:${size}px;height:${size}px;background:${color};"></div>`,
+    iconSize:[size,size], iconAnchor:[size/2,size/2]
+  });
+}
+function squareIcon(color, size=16){
+  return L.divIcon({
+    className:'', html:`<div style="width:${size}px;height:${size}px;background:${color};border:2px solid #04141F;border-radius:4px;"></div>`,
+    iconSize:[size,size], iconAnchor:[size/2,size/2]
+  });
+}
+
+// ---------- render ----------
+function clearLayer(arr){ arr.forEach(m=>map.removeLayer(m)); return []; }
+
+function render(){
+  if(!state) return;
+  hubMarkers = clearLayer(hubMarkers);
+  vehicleMarkers = clearLayer(vehicleMarkers);
+  demandMarkers = clearLayer(demandMarkers);
+  routeLines = clearLayer(routeLines);
+
+  // hubs
+  state.hubs.forEach(h=>{
+    const inv = Object.entries(h.inventory).map(([k,v])=>`${k}: ${v}`).join(' · ');
+    const m = L.marker([h.lat,h.lon], {icon:squareIcon('#5B9BD5')}).addTo(map)
+      .bindPopup(`<b>${h.name}</b><br><span style="color:#8996A6">${h.org}</span><br><span class="mono" style="font-size:11px">${inv}</span>`);
+    hubMarkers.push(m);
+  });
+
+  // vehicles (idle at hub, or mid-route shown at first waypoint if dispatched)
+  state.vehicles.forEach(v=>{
+    const hub = state.hubs.find(h=>h.id===v.hub_id);
+    if(!hub) return;
+    const m = L.marker([hub.lat,hub.lon], {icon:dot('#8B98A5',9)}).addTo(map)
+      .bindPopup(`<b>${v.id}</b> — ${v.type}<br>capacity ${v.capacity}<br>base: ${hub.name}`);
+    vehicleMarkers.push(m);
+  });
+
+  // allocations -> demand markers + routes
+  (state.allocations||[]).forEach(a=>{
+    const d = a.demand;
+    const critical = d.is_critical;
+    let color = '#F0A93B';
+    if(a.status==='approved') color = '#4CC17E';
+    else if(a.status==='overridden') color = '#B08CE8';
+    else if(a.status==='rejected') color = '#5C6B7C';
+    else if(critical) color = '#EE5B5F';
+    const size = 9 + Math.min(10, d.report_count*1.5);
+    const m = L.marker([d.lat,d.lon], {icon:dot(color, size)}).addTo(map)
+      .bindPopup(popupFor(a));
+    demandMarkers.push(m);
+
+    const hub = state.hubs.find(h=>h.id===a.hub_id);
+    if(hub){
+      const line = L.polyline([[hub.lat,hub.lon],[d.lat,d.lon]], {
+        color: a.blocked ? '#EE5B5F' : color,
+        weight: a.status==='approved' ? 3 : 1.6,
+        opacity: a.status==='rejected' ? 0.25 : 0.75,
+        dashArray: a.blocked ? '2,6' : (a.status==='approved' ? null : '5,5'),
+      }).addTo(map);
+      routeLines.push(line);
+    }
+  });
+
+  // held-for-corroboration, shown faint
+  (state.held_for_corroboration||[]).forEach(d=>{
+    const m = L.marker([d.lat,d.lon], {icon:dot('#3A4552', 7)}).addTo(map)
+      .bindPopup(`<b>Held — low confidence</b><br>${d.category} · confidence ${d.confidence}<br>Waiting for corroboration before dispatch.`);
+    demandMarkers.push(m);
+  });
+
+  renderSidebar();
+  renderRoadMenu();
+}
+
+function popupFor(a){
+  const d = a.demand;
+  return `<b>${d.ward_id} — ${d.category}</b> ${d.is_critical?'<span style="color:#EE5B5F">(critical)</span>':''}<br>
+    priority ${d.priority_score} · confidence ${d.confidence} · ${d.report_count} report(s)<br>
+    <span style="color:#8996A6;font-size:11.5px">${a.explanation}</span>`;
+}
+
+function renderSidebar(){
+  const allocList = document.getElementById('allocList');
+  const allocs = (state.allocations||[]).filter(a=>a.status!=='rejected');
+  allocList.innerHTML = allocs.length ? '' : '<div class="empty">No active recommendations. Click "Optimize now."</div>';
+  allocs.sort((a,b)=> (b.demand.is_critical - a.demand.is_critical) || (b.demand.priority_score - a.demand.priority_score));
+  allocs.forEach(a=>{
+    const d = a.demand;
+    const hub = state.hubs.find(h=>h.id===a.hub_id);
+    const div = document.createElement('div');
+    div.className = 'card';
+    div.innerHTML = `
+      <div class="crow">
+        <div>
+          <div class="title">${d.ward_id} · ${d.category} ${d.is_critical?'<span class="badge critical">Tier 1</span>':''}</div>
+          <div class="sub">${hub?hub.name:'—'} → ${a.distance_km} km ${a.blocked?'⚠ blocked leg':''}</div>
+        </div>
+        <span class="badge ${a.status}">${a.status}</span>
+      </div>
+      <div class="meta">
+        <span><b>priority</b> ${d.priority_score}</span>
+        <span><b>confidence</b> ${d.confidence}</span>
+        <span><b>qty</b> ${d.quantity_needed}</span>
+      </div>
+      <div class="explain">${a.explanation}</div>
+      ${a.status==='recommended' ? `
+      <div class="actions">
+        <button class="minibtn approve" onclick="approveAlloc('${a.id}')">Approve</button>
+        <button class="minibtn override" onclick="toggleOverride('${a.id}')">Override</button>
+        <button class="minibtn reject" onclick="rejectAlloc('${a.id}')">Reject</button>
+      </div>
+      <div class="override-form" id="ovf-${a.id}">
+        <select id="ovh-${a.id}">
+          ${state.hubs.map(h=>`<option value="${h.id}" ${h.id===a.hub_id?'selected':''}>${h.name}</option>`).join('')}
+        </select>
+        <input type="text" id="ovr-${a.id}" placeholder="reason code, e.g. local knowledge — road unsafe"/>
+        <button class="minibtn override" onclick="submitOverride('${a.id}')">Confirm reassignment</button>
+      </div>` : ''}
+    `;
+    allocList.appendChild(div);
+  });
+
+  const heldList = document.getElementById('heldList');
+  const held = state.held_for_corroboration || [];
+  heldList.innerHTML = held.length ? '' : '<div class="empty">Nothing held.</div>';
+  held.forEach(d=>{
+    const div = document.createElement('div');
+    div.className = 'card';
+    div.innerHTML = `<div class="crow"><div>
+        <div class="title">${d.ward_id} · ${d.category}</div>
+        <div class="sub">confidence ${d.confidence} — below dispatch threshold</div>
+      </div></div>`;
+    heldList.appendChild(div);
+  });
+
+  // event log
+  const ev = document.getElementById('eventLog');
+  ev.innerHTML = (state.event_log||[]).map(e=>`<div class="logrow"><span class="t mono">${e.t}</span>${escapeHtml(e.text)}</div>`).join('') || '<div class="empty">No events yet.</div>';
+
+  // audit log
+  const au = document.getElementById('auditLog');
+  au.innerHTML = (state.audit_log||[]).map(a=>`
+    <div class="logrow audit">
+      <span class="t mono">${a.t}</span><span class="action ${a.action}">${a.action}</span>${escapeHtml(a.detail)}
+      ${a.reason_code?`<div class="reason">reason: ${escapeHtml(a.reason_code)}</div>`:''}
+    </div>`).join('') || '<div class="empty">No overrides or approvals yet.</div>';
+
+  renderKpis();
+  renderPolicy();
+}
+
+function renderKpis(){
+  const grid = document.getElementById('kpiGrid');
+  const dedupSaved = (state.raw_report_count||0) - (state.demand_cluster_count||0);
+  grid.innerHTML = `
+    <div class="kpi"><div class="val">${state.last_solve_time ?? '—'}s</div><div class="lbl">last solve time (CP-SAT + VRP)</div></div>
+    <div class="kpi"><div class="val">${state.fairness_deviation_pct ?? '—'}%</div><div class="lbl">max ward fairness deviation, Tier-1 unmet</div></div>
+    <div class="kpi"><div class="val">${state.demand_cluster_count ?? 0}</div><div class="lbl">deduplicated demand clusters</div></div>
+    <div class="kpi"><div class="val">${dedupSaved}</div><div class="lbl">duplicate reports merged, not double-dispatched</div></div>
+    <div class="kpi wide"><div class="val">${state.last_optimized_at ?? '—'}</div><div class="lbl">last re-optimized at (rolling horizon)</div></div>
+  `;
+  const cmp = document.getElementById('compareTable');
+  const baseline = state.baseline_kpis;
+  const currentUnmet = computeCurrentCriticalUnmetPct();
+  cmp.innerHTML = baseline ? `
+    <div class="comparerow"><span>Critical unmet demand — baseline (nearest-resource)</span><b style="color:#EE5B5F">${baseline.critical_unmet_pct}%</b></div>
+    <div class="comparerow"><span>Critical unmet demand — Setu (priority + fairness optimizer)</span><b style="color:#4CC17E">${currentUnmet}%</b></div>
+  ` : '<div class="empty">Run "Optimize now" to compute.</div>';
+}
+
+function computeCurrentCriticalUnmetPct(){
+  const allocs = state.allocations||[];
+  const servedKeys = new Set(allocs.filter(a=>a.status!=='rejected').map(a=>a.demand_key));
+  // approximate using demand list is not directly available client-side beyond allocations + held;
+  // use fairness computation proxy from server field if present, else compute from allocations/held
+  const criticalHeld = (state.held_for_corroboration||[]).filter(d=>d.is_critical).length;
+  const criticalAllocated = allocs.filter(a=>a.demand.is_critical && a.status!=='rejected').length;
+  const totalCritical = criticalAllocated + criticalHeld;
+  if(totalCritical===0) return '0.0';
+  return (100*(1 - criticalAllocated/totalCritical)).toFixed(1);
+}
+
+const POLICY_LABELS = {
+  severity:'Severity weight', population:'Population-affected weight', vulnerability:'Vulnerability weight',
+  freshness:'Freshness weight', confidence_penalty:'Low-confidence penalty'
+};
+const POLICY_RANGES = {
+  severity:[0,50], population:[0,1], vulnerability:[0,40], freshness:[0,30], confidence_penalty:[0,50]
+};
+let policyDebounce;
+function renderPolicy(){
+  const wrap = document.getElementById('policySliders');
+  if(wrap.dataset.built) { // just sync displayed values without rebuilding (avoid fighting user drag)
+    Object.keys(POLICY_LABELS).forEach(k=>{
+      const span = document.getElementById('pv-'+k);
+      if(span && document.activeElement.id !== 'ps-'+k) span.textContent = state.policy_weights[k];
+    });
+    return;
+  }
+  wrap.dataset.built = '1';
+  wrap.innerHTML = Object.keys(POLICY_LABELS).map(k=>{
+    const [lo,hi] = POLICY_RANGES[k];
+    const step = hi<=1?0.02:0.5;
+    return `<div class="slider-row">
+      <div class="lbl"><span>${POLICY_LABELS[k]}</span><span id="pv-${k}">${state.policy_weights[k]}</span></div>
+      <input type="range" id="ps-${k}" min="${lo}" max="${hi}" step="${step}" value="${state.policy_weights[k]}"
+        oninput="document.getElementById('pv-${k}').textContent=this.value"
+        onchange="updatePolicy('${k}', this.value)"/>
+    </div>`;
+  }).join('');
+}
+function updatePolicy(key, val){
+  clearTimeout(policyDebounce);
+  policyDebounce = setTimeout(async ()=>{
+    setBusy(true);
+    const body = {}; body[key] = parseFloat(val);
+    state = await postJSON('/api/policy', body);
+    render();
+    setBusy(false);
+  }, 250);
+}
+
+function renderRoadMenu(){
+  const panel = document.getElementById('roadpanel');
+  panel.innerHTML = (state.road_segments||[]).map(r=>`
+    <div class="roadrow">
+      <span>${r.name}</span>
+      <div class="rtoggle ${r.blocked?'on':''}" onclick="toggleRoad('${r.id}')"><div class="knob"></div></div>
+    </div>
+  `).join('');
+}
+function toggleRoadMenu(){
+  roadMenuOpen = !roadMenuOpen;
+  document.getElementById('roadmenu').classList.toggle('open', roadMenuOpen);
+}
+document.addEventListener('click', (e)=>{
+  if(roadMenuOpen && !document.getElementById('roadmenu').contains(e.target)){
+    roadMenuOpen=false; document.getElementById('roadmenu').classList.remove('open');
+  }
+});
+
+function toggleOverride(id){
+  document.getElementById('ovf-'+id).classList.toggle('open');
+}
+
+function escapeHtml(s){ const d=document.createElement('div'); d.textContent=s??''; return d.innerHTML; }
+
+// ---------- API calls ----------
+async function postJSON(path, body){
+  const res = await fetch(API+path, {method:'POST', headers:{'Content-Type':'application/json'}, body: body?JSON.stringify(body):undefined});
+  if(!res.ok){ const t = await res.text(); throw new Error(t); }
+  return res.json();
+}
+async function getJSON(path){
+  const res = await fetch(API+path);
+  return res.json();
+}
+
+function setBusy(b){
+  busy = b;
+  document.getElementById('livedot').classList.toggle('busy', b);
+  document.getElementById('livetext').textContent = b ? 'recalculating…' : 'live';
+}
+
+async function refresh(){
+  if(busy) return;
+  try{
+    const s = await getJSON('/api/state');
+    state = s;
+    render();
+  }catch(e){ console.error(e); }
+}
+
+async function doOptimize(){
+  setBusy(true);
+  try{ state = await postJSON('/api/optimize'); render(); toast('Optimizer re-solved: assignment (CP-SAT) + routing (VRP).'); }
+  finally{ setBusy(false); }
+}
+async function simCrowd(){
+  setBusy(true);
+  try{ state = await postJSON('/api/simulate/crowd_report'); render(); toast('Crowdsourced reports injected — clustered, scored, and re-optimized.'); }
+  finally{ setBusy(false); }
+}
+async function simCritical(){
+  setBusy(true);
+  try{ state = await postJSON('/api/simulate/critical'); render(); toast('Critical Tier-1 emergency injected — recommendation recalculated live.'); }
+  finally{ setBusy(false); }
+}
+async function toggleRoad(id){
+  setBusy(true);
+  try{ state = await postJSON(`/api/roadblock/${id}/toggle`); render(); toast('Road status changed — affected routes recalculated.'); }
+  finally{ setBusy(false); }
+}
+async function approveAlloc(id){
+  setBusy(true);
+  try{ state = await postJSON(`/api/allocation/${id}/approve`); render(); toast('Dispatch approved — inventory reserved, logged to audit trail.'); }
+  finally{ setBusy(false); }
+}
+async function rejectAlloc(id){
+  setBusy(true);
+  try{ state = await postJSON(`/api/allocation/${id}/reject`); render(); toast('Recommendation rejected.'); }
+  finally{ setBusy(false); }
+}
+async function submitOverride(id){
+  const hub = document.getElementById('ovh-'+id).value;
+  const reason = document.getElementById('ovr-'+id).value || 'coordinator override (no reason given)';
+  setBusy(true);
+  try{ state = await postJSON(`/api/allocation/${id}/override`, {new_hub_id:hub, reason_code:reason}); render(); toast('Override applied and logged.'); }
+  finally{ setBusy(false); }
+}
+async function resetScenario(){
+  setBusy(true);
+  try{ state = await postJSON('/api/reset'); render(); toast('Scenario reset to fresh synthetic flood data.'); }
+  finally{ setBusy(false); }
+}
+
+// ---------- public locator ----------
+async function fetchShelters(){
+  const data = await getJSON('/api/shelters');
+  publicMarkers.forEach(m=>publicMap.removeLayer(m));
+  publicMarkers = [];
+  data.hubs.forEach(h=>{
+    const m = L.marker([h.lat,h.lon], {icon:squareIcon('#5B9BD5',14)}).addTo(publicMap).bindPopup(`<b>${h.name}</b><br>Relief hub`);
+    publicMarkers.push(m);
+  });
+  const cards = document.getElementById('shelterCards');
+  cards.innerHTML = '';
+  data.shelters.forEach(s=>{
+    const pct = Math.min(100, Math.round(100*s.occupancy/s.capacity));
+    const color = pct>=95 ? '#EE5B5F' : '#3FCFB0';
+    const m = L.marker([s.lat,s.lon], {icon:dot(pct>=95?'#EE5B5F':'#3FCFB0',13)}).addTo(publicMap)
+      .bindPopup(`<b>${s.name}</b><br>${s.occupancy}/${s.capacity} occupied`);
+    publicMarkers.push(m);
+    const chip = document.createElement('div');
+    chip.className = 'shelter-chip';
+    chip.innerHTML = `<div class="n">${s.name}</div>
+      <div class="occ">${s.occupancy} / ${s.capacity} occupied ${pct>=95?'— near capacity':''}</div>
+      <div class="occbar"><i style="width:${pct}%;background:${color}"></i></div>
+      <div class="updated">Last updated moments ago</div>`;
+    cards.appendChild(chip);
+  });
+}
+
+// ---------- boot ----------
+initMap();
+refresh();
+setInterval(refresh, 3000);
+</script>
+</body>
+</html>
