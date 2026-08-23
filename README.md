@@ -1,386 +1,527 @@
-https://res-q-flow.onrender.com/
+# Setu (सेतु)
 
-Setu (सेतु) — Disaster Relief Resource-Demand Matching Prototype
+### Disaster Relief Resource-Demand Matching & Routing
 
-A working prototype of the core loop described in the SETU / SIH 2026 PS33 design document: a continuously re-solved, explainable, human-approved allocation-and-routing recommendation system, built for a synthetic East Delhi flood scenario.
+[Live Demo](https://res-q-flow.onrender.com/)
 
-Phase-12 Hackathon MVP: This is not the full 25-phase production system. It runs entirely on your machine, with no external services required at runtime except map tiles.
+Setu is a disaster-relief decision-support prototype that continuously matches relief resources to incoming demand and generates routing recommendations.
 
-🚀 What's Implemented
-Resource Registry — 3 relief hubs, 6 vehicles, 4 shelters, and 10 wards (backend/seed.py)
-Demand Intake & Deduplication — Synthetic and simulated crowdsourced reports, deduplicated by geo-proximity and keyword-overlap text similarity (backend/optimizer.py :: dedup_cluster)
-Priority & Confidence Scoring — Transparent, tunable weighted formula with live-editable weights in the Policy tab
-Allocation Optimizer — Google OR-Tools CP-SAT constrained assignment (solve_allocation)
-Routing — Google OR-Tools Routing Library, using a capacitated VRP per hub (solve_routes)
-Rolling-Horizon Re-optimization — Automatically re-solves after:
-New demand
-Crowdsourced report bursts
-Road-block toggles
-Critical-emergency injection
-Policy-weight changes
-Human-in-the-Loop — Every recommendation must be approved, overridden, or rejected before dispatch
-Immutable Audit Log — Coordinator actions are recorded with reason codes
-Fairness Metric — Tracks maximum deviation in unmet critical-demand share across wards
-Baseline-vs-Setu Comparison — Compares the optimizer against a naive nearest-available-resource baseline
-Public Shelter Locator — Separate, read-only citizen-facing view with no login
-❌ What's Not Implemented
+The system is designed around a **human-in-the-loop workflow**: optimization proposes decisions, while coordinators review, approve, override, or reject them before dispatch.
 
-These features are intentionally outside the Phase-12 MVP scope:
+The current prototype simulates a flood-response scenario in **East Delhi** using synthetic data.
 
-No real SMS/social-media ingestion — crowdsourced reports are simulated
-No real IDRN/Sachet integration
-No Flutter offline field app
-No production database — state is in-memory and resets when the server restarts or when Reset scenario is clicked
-No authentication/RBAC — this is a single-role demonstration console
-🛠️ Requirements
-Python 3.10+
-pip
+---
 
-No Node.js or frontend build step is required.
+## ✨ Features
 
-The frontend is a single static HTML file with Leaflet and IBM Plex fonts vendored in:
+* **Resource Management**
 
-frontend/vendor/
+  * Relief hubs
+  * Vehicles
+  * Shelters
+  * Wards
 
+* **Demand Management**
 
-There is no CDN dependency for the application shell.
+  * Synthetic emergency requests
+  * Crowdsourced reports
+  * Duplicate-report detection
+  * Geo-proximity and text-similarity clustering
 
-▶️ Run Locally
-1. Clone the repository
-git clone <your-repository-url>
-cd <your-repository-directory>
+* **Priority Scoring**
 
-2. Install backend dependencies
-cd backend
-pip install -r requirements.txt
+  * Severity
+  * Urgency
+  * Demand confidence
+  * Population/context factors
+  * Configurable policy weights
 
-3. Start the server
-uvicorn main:app --host 0.0.0.0 --port 8000
+* **Resource Allocation**
 
-4. Open the application
+  * Google OR-Tools CP-SAT
+  * Capacity constraints
+  * Demand-resource matching
+  * Priority-aware optimization
 
-Visit:
+* **Vehicle Routing**
 
-http://localhost:8000
+  * Capacitated Vehicle Routing Problem (CVRP)
+  * Per-hub routing
+  * Dynamic route updates
 
+* **Rolling-Horizon Optimization**
 
-That's it.
+  * Re-optimizes when the scenario changes
+  * New demand
+  * Report bursts
+  * Road blocks
+  * Critical emergencies
+  * Policy changes
 
-A single FastAPI process serves both the API and frontend.
+* **Human-in-the-Loop**
 
-🗺️ Map Tiles
+  * Approve recommendations
+  * Override recommendations
+  * Reject recommendations
+  * Reason codes for overrides
 
-The application uses CartoDB's free dark map tiles:
+* **Auditability**
 
-basemaps.cartocdn.com
+  * Immutable action log
+  * Coordinator decisions
+  * Override reasons
+  * Optimization events
 
+* **Fairness Monitoring**
 
-Map tiles require internet access from your browser, but the Python backend does not require internet access.
+  * Tracks deviation in unmet critical demand between wards
 
-If you're demoing without internet:
+* **Baseline Comparison**
 
-The application still runs
-Hubs still render
-Vehicles still render
-Demand markers still render
-Routes still render
-Priority queue still works
-Optimizer still works
-Audit log still works
-KPIs still render
+  * Compares Setu against a nearest-available-resource baseline
 
-Only the underlying street-map imagery will be unavailable.
+* **Public Shelter Locator**
 
-For a fully offline basemap, replace the L.tileLayer(...) URL in:
+  * Read-only citizen-facing shelter view
+  * No coordinator access required
 
-frontend/index.html
+---
 
+## 🖥️ Demo
 
-with a locally hosted tile set.
+**Live application:** https://res-q-flow.onrender.com/
 
-🎬 Suggested Demo Flow
+The application includes two primary experiences:
 
-The following sequence mirrors the design document's Phase 22 demo.
+### Coordinator Console
 
-1. Open the Coordinator Console
+Used by relief coordinators to:
 
-The application loads with a pre-populated synthetic East Delhi flood scenario.
+* Monitor demand
+* View available resources
+* Run optimization
+* Review recommendations
+* Approve or override allocations
+* Monitor routes
+* Simulate road blocks
+* Inject emergency demand
+* Inspect KPIs
+* Review the audit log
+* Modify optimization policy weights
 
-2. Simulate Crowdsourced Reports
+### Public Shelter Locator
 
-Click:
+A simplified, read-only interface for citizens to locate available relief shelters.
 
-Simulate crowdsourced reports
+---
 
-A burst of noisy reports will be generated and clustered into a demand with an updated confidence score.
+## 🧠 How It Works
 
-3. Inspect the Priority Queue
+Setu follows a continuous feedback loop:
 
-Look for the high-severity-but-quiet Ward 9 demand.
+```text
+Demand / Reports
+       ↓
+Deduplication & Clustering
+       ↓
+Priority & Confidence Scoring
+       ↓
+Resource Allocation
+       ↓
+Route Optimization
+       ↓
+Coordinator Review
+       ↓
+Approve / Override / Reject
+       ↓
+Dispatch Recommendation
+       ↓
+Scenario Changes
+       ↓
+Re-optimization
+```
 
-It should rank at or near the top instead of simply prioritizing the closest or loudest request.
+The key idea is that the system does **not** generate a plan once and stop.
 
-4. Approve and Override Recommendations
+Whenever the operational state changes, the optimizer can generate a new recommendation.
 
-Click:
+---
 
-Optimize now
+## ⚙️ Optimization
 
-Then:
+### Priority Scoring
 
-Approve one recommendation
-Override another
-Enter a reason code
+Demand priority is calculated using a transparent weighted formula rather than a black-box machine-learning model.
 
-Open the Audit tab to see the actions recorded.
+The weights can be modified from the **Policy** panel during runtime.
 
-5. Toggle a Road Block
+This makes the prioritization logic visible and auditable.
 
-Open:
+### Resource Allocation
 
-Road blocks ▾
+Allocation is formulated as a constrained optimization problem using:
 
-Toggle a road segment.
+**Google OR-Tools CP-SAT**
 
-Affected allocations should re-route live and appear with a dashed red route on the map.
+The intended optimization hierarchy is:
 
-6. Inject a Critical Emergency
-
-Click:
-
-Inject critical emergency
-
-A new Tier-1 demand will appear and trigger another optimization cycle.
-
-7. Inspect KPIs
-
-Open the KPIs tab.
-
-Look at:
-
-Baseline vs Setu critical-unmet-demand comparison
-Last solve time
-Fairness metrics
-
-The solve-time figure is measured from the actual optimization run rather than being a static estimate.
-
-8. Open the Public Shelter Locator
-
-Switch to:
-
-Public Shelter Locator
-
-This demonstrates the citizen-facing, read-only shelter view.
-
-9. Change the Policy
-
-Open:
-
-Policy
-
-Move one of the weight sliders.
-
-The recommendation set should update live, demonstrating that the priority formula is a visible and auditable policy artifact rather than a black box.
-
-📊 Important: Interpreting the KPIs
-
-All KPI values are:
-
-Prototype simulation results using synthetic data.
-
-They are labeled as such in the UI.
-
-For presentations, demos, and judging, they should not be presented as measurements from a real disaster or as validated real-world performance improvements.
-
-📁 Project Structure
-.
-├── backend/
-│   ├── main.py
-│   │   └── FastAPI application, state, endpoints, KPIs, audit log
-│   │
-│   ├── optimizer.py
-│   │   └── Deduplication, scoring, CP-SAT allocation, VRP routing
-│   │
-│   ├── seed.py
-│   │   └── Synthetic East Delhi flood scenario
-│   │
-│   └── requirements.txt
-│
-└── frontend/
-    ├── index.html
-    │   └── Coordinator Console + Public Shelter Locator
-    │
-    └── vendor/
-        └── Vendored Leaflet + IBM Plex fonts
-
-🧠 Optimization Approach
-Priority Scoring
-
-Demand priority is calculated using a transparent weighted formula rather than a black-box ML model.
-
-The weights are exposed through the Policy tab and can be modified during runtime.
-
-Allocation
-
-Resource allocation uses:
-
-Google OR-Tools CP-SAT
-
-The design document describes a lexicographic objective:
-
+```text
 Life Safety
     ↓
 Response Time
     ↓
 Fairness
     ↓
-Efficiency
+Resource Efficiency
+```
 
+The current prototype implements this as a **weighted-sum formulation** rather than a strict lexicographic optimization.
 
-For this MVP, the objective is implemented as a weighted-sum relaxation of the lexicographic formulation.
+### Vehicle Routing
 
-This is a practical simplification for the prototype scale.
+Routes are generated using the Google OR-Tools Routing Library with a capacitated vehicle-routing formulation.
 
-Routing
+Each relief hub independently handles its assigned vehicles and demand.
 
-Vehicle routing uses the Google OR-Tools Routing Library with a capacitated vehicle-routing formulation per relief hub.
+---
 
-🔄 Rolling-Horizon Re-optimization
+## 🔄 Rolling-Horizon Re-optimization
 
-The optimizer automatically re-solves whenever the system state changes.
+The optimizer reacts to changes in the operational state.
 
-Examples include:
+| Event                | System Response |
+| -------------------- | --------------- |
+| New demand           | Re-optimize     |
+| Crowdsourced reports | Re-optimize     |
+| Road block           | Re-optimize     |
+| Critical emergency   | Re-optimize     |
+| Policy change        | Re-optimize     |
 
-New demand
-    ↓
-Re-optimize
+This allows the prototype to demonstrate a continuously updated response plan instead of a static allocation.
 
-Crowdsourced report burst
-    ↓
-Re-optimize
+---
 
-Road block
-    ↓
-Re-optimize
+## 👤 Human-in-the-Loop
 
-Critical emergency
-    ↓
-Re-optimize
+Setu is designed as a **decision-support system**, not an autonomous dispatcher.
 
-Policy change
-    ↓
-Re-optimize
+```text
+Optimization Recommendation
+            │
+      ┌─────┼─────┐
+      ↓     ↓     ↓
+   Approve Override Reject
+      │      │      │
+      ↓      ↓      ↓
+  Dispatch Modified  No
+           Dispatch Dispatch
+```
 
+Overrides require a reason code, and coordinator actions are recorded in the audit log.
 
-This is the core feedback loop demonstrated by the prototype.
+---
 
-👤 Human-in-the-Loop
+## ⚖️ Fairness
 
-Setu does not automatically dispatch every optimization result.
+The prototype monitors the maximum deviation in **unmet critical-demand share across wards**.
 
-Each recommendation requires coordinator action:
+This provides an additional signal for identifying whether the allocation is disproportionately neglecting a particular area.
 
-Recommendation
-      │
-      ├── Approve ──→ Dispatch
-      │
-      ├── Override ─→ Dispatch modified decision
-      │
-      └── Reject ───→ No dispatch
+Fairness is displayed alongside other operational KPIs.
 
+---
 
-Overrides require a reason code and all coordinator actions are recorded in the audit log.
+## 🆚 Baseline vs Setu
 
-This keeps the optimizer in a decision-support role rather than treating it as an autonomous dispatcher.
+Setu evaluates its allocation against a simple baseline strategy:
 
-⚖️ Fairness
+> **Assign the nearest available resource.**
 
-The prototype tracks the maximum deviation in unmet critical-demand share across wards.
+The same demand scenario is evaluated using both approaches:
 
-This provides a live indication of whether the allocation is disproportionately neglecting a particular ward.
+```text
+Scenario
+   ├── Nearest Available Resource
+   │
+   └── Setu Optimizer
+```
 
-The fairness metric is displayed in the KPI panel.
+The dashboard then compares their results using the available prototype KPIs.
 
-🆚 Baseline vs Setu
+---
 
-The system computes a naive baseline using the:
+## 📊 KPIs
 
-Nearest available resource
+The dashboard currently exposes metrics such as:
 
-strategy.
+* Critical unmet demand
+* Baseline vs Setu comparison
+* Optimization solve time
+* Fairness metrics
+* Resource utilization
+* Current operational state
 
-The same demand set is evaluated against both:
+> **Important:** KPI values are generated from synthetic simulation data. They should not be interpreted as validated performance improvements from a real disaster.
 
-Baseline allocation
-Setu optimized allocation
+---
 
-This allows the KPI panel to show a live comparison rather than relying on a manually claimed improvement.
+## 🗺️ Mapping
 
-⚠️ Known Limitations
-1. Weighted-Sum Objective
+The application uses **Leaflet** for map rendering and CartoDB map tiles for the basemap.
 
-The design document specifies a lexicographic optimization objective.
+The Python backend itself does not require internet access for the optimization logic.
 
-The prototype approximates this using a weighted sum rather than solving each objective tier independently.
+Without internet access:
 
-This is a deliberate simplification.
+* Resource markers still work
+* Demand markers still work
+* Routes still work
+* Priority queue still works
+* Optimization still works
+* KPIs still work
+* Audit logs still work
 
-2. Simplified Road Network
+Only the underlying street-map tiles become unavailable.
 
-Road blocks are modeled as a heavy penalty on a specific:
+---
 
-Hub ↔ Ward
+## 🛠️ Tech Stack
 
+| Layer        | Technology              |
+| ------------ | ----------------------- |
+| Backend      | Python, FastAPI         |
+| Optimization | Google OR-Tools CP-SAT  |
+| Routing      | Google OR-Tools Routing |
+| Frontend     | HTML, CSS, JavaScript   |
+| Maps         | Leaflet                 |
+| Fonts        | IBM Plex                |
+| Server       | Uvicorn                 |
+| Data         | Synthetic scenario data |
 
-leg.
+The frontend is intentionally lightweight and does not require a Node.js build pipeline.
 
-The prototype does not contain a complete OSM road-network graph or real-world routing engine.
+---
 
-3. In-Memory State
+## 📁 Project Structure
 
-All application state is stored in memory.
+```text
+.
+├── backend/
+│   ├── main.py
+│   ├── optimizer.py
+│   ├── seed.py
+│   └── requirements.txt
+│
+└── frontend/
+    ├── index.html
+    └── vendor/
+        ├── leaflet/
+        └── fonts/
+```
 
-Restarting the backend resets the scenario.
+### Key Files
 
-Clicking Reset scenario also resets the state.
+**`backend/main.py`**
 
-4. Single-Process Architecture
+FastAPI application, API endpoints, application state, KPIs, and audit logging.
 
-This is a hackathon prototype and does not provide:
+**`backend/optimizer.py`**
 
-Multi-user concurrency
-Persistent storage
-Distributed optimization
-Production fault tolerance
-Authentication
-Role-based access control
-🔮 Future Scope
+Contains demand deduplication, priority scoring, resource allocation, and vehicle routing.
 
-Potential extensions beyond the Phase-12 MVP include:
+**`backend/seed.py`**
 
-Real SMS and social-media ingestion
-IDRN/Sachet integration
-Real-time road-network routing
-OSM-based routing graphs
-Persistent PostgreSQL-backed state
-Authentication and RBAC
-Flutter-based offline field application
-Multi-coordinator collaboration
-Production-grade observability
-Real disaster-data integrations
-More sophisticated fairness constraints
-Full lexicographic multi-objective optimization
-⚠️ Disclaimer
+Creates the synthetic East Delhi flood scenario.
 
-Setu is a prototype for demonstration and evaluation.
+**`frontend/index.html`**
 
-It uses synthetic disaster data and simulated inputs. It is not a production emergency-response system and should not be used to make real-world disaster-relief decisions.
+Coordinator Console and Public Shelter Locator.
 
-📜 License
+---
 
-Add your project's license here, for example:
+## 🚀 Run Locally
 
-MIT License
+### Requirements
 
+* Python 3.10+
+* pip
 
-if the repository is intended to be released under MIT.
+No Node.js installation or frontend build step is required.
+
+### 1. Clone the repository
+
+```bash
+git clone <repository-url>
+cd <repository-directory>
+```
+
+### 2. Install dependencies
+
+```bash
+cd backend
+pip install -r requirements.txt
+```
+
+### 3. Start the server
+
+```bash
+uvicorn main:app --host 0.0.0.0 --port 8000
+```
+
+### 4. Open the application
+
+Visit:
+
+```text
+http://localhost:8000
+```
+
+A single FastAPI process serves both the API and frontend.
+
+---
+
+## 🎬 Suggested Demo
+
+For a quick demonstration of the core workflow:
+
+### 1. Start with the Coordinator Console
+
+The application loads a pre-populated synthetic East Delhi flood scenario.
+
+### 2. Simulate Crowdsourced Reports
+
+Use **Simulate crowdsourced reports** to generate noisy incoming reports.
+
+The system clusters duplicate reports and updates the corresponding demand confidence.
+
+### 3. Run Optimization
+
+Click **Optimize now**.
+
+Inspect:
+
+* Priority queue
+* Resource allocations
+* Vehicle routes
+* KPIs
+
+### 4. Test Human Approval
+
+Approve one recommendation and override another.
+
+Provide a reason code for the override and inspect the **Audit** tab.
+
+### 5. Simulate a Road Block
+
+Open **Road blocks** and toggle a road segment.
+
+The system recalculates affected recommendations and routes.
+
+### 6. Inject a Critical Emergency
+
+Use **Inject critical emergency**.
+
+A new high-priority demand is introduced and another optimization cycle is triggered.
+
+### 7. Inspect KPIs
+
+Open the **KPIs** panel and compare:
+
+* Baseline vs Setu
+* Critical unmet demand
+* Solve time
+* Fairness metrics
+
+### 8. Test Policy Changes
+
+Open **Policy** and modify the priority weights.
+
+The recommendation set updates based on the new policy.
+
+### 9. Open the Public Shelter Locator
+
+Switch to the public-facing shelter view to demonstrate the citizen-side experience.
+
+---
+
+## ⚠️ Current Limitations
+
+This is a hackathon-scale prototype and intentionally simplifies several production concerns.
+
+### Optimization
+
+The intended lexicographic objective is currently implemented as a weighted-sum approximation.
+
+### Routing
+
+Road blocks are currently represented using penalties on specific hub-to-ward legs rather than a complete real-world road graph.
+
+### Data
+
+The prototype uses synthetic disaster data and simulated crowdsourced reports.
+
+### Persistence
+
+Application state is stored in memory.
+
+Restarting the server or using **Reset Scenario** clears the current state.
+
+### Architecture
+
+The current implementation is single-process and does not include:
+
+* Persistent database storage
+* Multi-user concurrency
+* Authentication
+* Role-based access control
+* Distributed optimization
+* Production fault tolerance
+* Production observability
+
+---
+
+## 🔮 Future Scope
+
+Potential extensions include:
+
+* Real SMS and social-media ingestion
+* IDRN / Sachet integration
+* Real-time OSM-based routing
+* Persistent PostgreSQL storage
+* Authentication and RBAC
+* Offline field application
+* Multi-coordinator collaboration
+* Real-time disaster-data integration
+* Advanced fairness constraints
+* Strict lexicographic multi-objective optimization
+* Production monitoring and observability
+
+---
+
+## 📌 Project Status
+
+**Current:** Hackathon MVP / Prototype
+
+The current version demonstrates the core operational loop:
+
+> **Demand → Prioritization → Allocation → Routing → Human Review → Re-optimization**
+
+It is intended for demonstration, experimentation, and evaluation rather than real-world emergency deployment.
+
+---
+
+## ⚠️ Disclaimer
+
+Setu is a prototype decision-support system.
+
+All disaster scenarios, demand data, and crowdsourced inputs used by the current implementation are synthetic or simulated.
+
+**Setu must not be used to make real-world disaster-response or emergency-relief decisions.**
+
+---
+
+## 📄 License
+
+This project is currently provided for demonstration and evaluation.
+
+If the repository is intended for public release, add an appropriate open-source license such as the **MIT License**.
