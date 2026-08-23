@@ -1,3 +1,5 @@
+https://res-q-flow.onrender.com/
+
 Setu (सेतु) — Disaster Relief Resource-Demand Matching Prototype
 
 A working prototype of the core loop described in the SETU / SIH 2026 PS33 design document: a continuously re-solved, explainable, human-approved allocation-and-routing recommendation system, built for a synthetic East Delhi flood scenario.
